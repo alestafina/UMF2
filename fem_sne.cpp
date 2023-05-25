@@ -9,11 +9,11 @@ double Functions::u_g(double x, double t) {
 }
 
 double Functions::f(double x, double t) {
-   return x * t;
+   return x;
 }
 
 double Functions::theta(double x, double t) {
-   return x * t;
+   return t;
 }
 
 double Functions::u_betta(double x, double t) {
@@ -86,10 +86,10 @@ void Fem::read_data() {
 
 void Fem::making_grid() {
    for (int i = 1; i < nx; i++)
-      grid[i] = grid[0] + hx * pow(kx, i - 1);
+      grid[i] = grid[i- 1] + hx * pow(kx, i - 1);
 
    for (int i = 1; i < n_times; i++)
-      times[i] = times[0] + ht * pow(kt, i - 1);
+      times[i] = times[i - 1] + ht * pow(kt, i - 1);
 
    loc_M.resize(2, vector<double>(2));
    loc_G.resize(2, vector<double>(2));
@@ -256,9 +256,11 @@ void Fem::boundary(double t) {
 double Fem::residual() {
    vector<double> vec(nx);
    double res = 0.0; double nb = 0.0;
+   vec = matr_vec_mult(q, A);
+   for (int i = 0; i < 0; i++) vec[i] -= d[i];
    for (int i = 0; i < nx; i++) {
-      vec[i] = A[0][i] * q[i - 1] + A[1][i] * q[i] + A[2][i] * q[i + 1] - d[i];
-      res += vec[i] * vec[i]; nb += d[i] * d[i];
+      res += vec[i] * vec[i]; 
+      nb += d[i] * d[i];
    }
    return sqrt(res / nb);
 }
@@ -267,11 +269,11 @@ void Fem::relax(vector<double> &q_prev) {
    for (int i = 0; i < nx; i++) q[i] = w * q[i] + (1.0 - w) * q_prev[i];
 }
 
-
 void Fem::errLine(ofstream &fout, int idx) {
    Functions real;
    fout << "Error:;;;";
-   for (int i = 0; i < nx; i++) fout << abs(q[i] - real.u_real(grid[i], times[i])) << ';';
+   for (int i = 0; i < nx; i++) 
+      fout << abs(q[i] - real.u_real(grid[i], times[idx])) << ';';
 }
 
 void Fem::iterLine(double resid, int num, ofstream &fout) {
@@ -282,23 +284,19 @@ void Fem::iterLine(double resid, int num, ofstream &fout) {
 }
 
 void Fem::FPI() {
-   ofstream fout("answer.txt");
+   ofstream fout("answer.csv");
    int num = 0;
    int maxiter = 1000;
    double eps = 1e-14;
    double resid = 10.0;
 
    vector<double> q_prev(nx);
-   for (int i = 0; i < nx; i++) q[i] = 1.0;
-   for (int i = 0; i < nx; i++) q_prev[i] = q[i];
-
-   resid = residual();
 
    for (int i = 1; i < n_times; i++) {
       while (resid > eps && num < maxiter) {
          time_scheme(i);
          LU();
-         relax(q_prev);
+         //relax(q_prev);
          num++;
          resid = residual();
          q_prev = q;
