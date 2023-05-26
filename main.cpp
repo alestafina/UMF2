@@ -6,5 +6,6 @@ int main() {
    matrix.making_grid();
    matrix.init_cond();
    matrix.FPI();
+   //matrix.LU();
    return 0;
 }

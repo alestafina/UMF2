@@ -21,7 +21,7 @@ double Functions::u_betta(double x, double t) {
 }
 
 double Functions::lambda(double u) {
-   return u;
+   return 1.0;
 }
 
 Fem::Fem() {
@@ -35,18 +35,12 @@ Fem::Fem() {
    grid = vector<double>();
    times = vector<double>();
    q_init = vector<double>();
-   loc_M = vector<vector<double>>();
-   loc_G = vector<vector<double>>();
-   loc_b = vector<double>();
-   first_bc = vector<int>();
-   second_bc = vector<int>();
-   thrid_bc = vector<int>();
 
    nx = 0;                               
    n_times = 0;                          
    hx = 1, ht = 1, kx = 1, kt = 1;                
    betta = 0, sigma = 0;                  
-   w = 1.6;                             
+   w = 1.0;                             
 }
 
 Fem::~Fem() {
@@ -60,12 +54,6 @@ Fem::~Fem() {
    grid.~vector();
    times.~vector();
    q_init.~vector();
-   loc_M.~vector();
-   loc_G.~vector();
-   loc_b.~vector();
-   first_bc.~vector();
-   second_bc.~vector();
-   thrid_bc.~vector();
 }
 
 void Fem::read_data() {
@@ -91,11 +79,6 @@ void Fem::making_grid() {
    for (int i = 1; i < n_times; i++)
       times[i] = times[i - 1] + ht * pow(kt, i - 1);
 
-   loc_M.resize(2, vector<double>(2));
-   loc_G.resize(2, vector<double>(2));
-
-   loc_b.resize(2);
-
    d.resize(nx);
    q.resize(nx);
 }
@@ -108,44 +91,31 @@ void Fem::init_cond() {
       q_init[i] = init.u_real(grid[i], times[0]);
 }
 
-void Fem::glob_M() {
-   double el1, el2;
-   
+void Fem::glob_M() {   
    M.clear();
-   M.resize(3, vector<double>(nx));
+   M.resize(3);
+   for (int i = 0; i < 3; i++) M[i].resize(nx);
 
    for (int i = 0; i < nx - 1; i++) {
-      el1 = (sigma * (grid[i + 1] - grid[i]) * 2) / 6.0;
-      el2 = (sigma * (grid[i + 1] - grid[i])) / 6.0;
-
-      loc_M[0][0] = loc_M[1][1] = el1;
-      loc_M[0][1] = loc_M[1][0] = el2;
-
-      M[0][i + 1] = loc_M[1][0];
-      M[2][i] = loc_M[0][1];
-      M[1][i] += loc_M[0][0];
-      M[1][i + 1] += loc_M[1][1];
+      M[0][i + 1]  = (sigma * (grid[i + 1] - grid[i])) / 6.0;
+      M[2][i]      = (sigma * (grid[i + 1] - grid[i])) / 6.0;
+      M[1][i]     += (sigma * (grid[i + 1] - grid[i]) * 2) / 6.0;
+      M[1][i + 1] += (sigma * (grid[i + 1] - grid[i]) * 2) / 6.0;
    }
 }
 
 void Fem::glob_G() {
    Functions L;
-   double el1, el2;
 
    G.clear();
-   G.resize(3, vector<double>(nx));
+   G.resize(3);
+   for (int i = 0; i < 3; i++) G[i].resize(nx);
 
    for (int i = 0; i < nx - 1; i++) {
-      el1 = (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
-      el2 = - (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
-
-      loc_G[0][0] = loc_G[1][1] = el1;
-      loc_G[0][1] = loc_G[1][0] = el2;
-
-      G[0][i + 1] = loc_G[1][0];
-      G[2][i] = loc_G[0][1];
-      G[1][i] += loc_G[0][0];
-      G[1][i + 1] += loc_G[1][1];
+      G[0][i + 1] = -(L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
+      G[2][i]     = -(L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
+      G[1][i]     += (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
+      G[1][i + 1] += (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * (grid[i + 1] - grid[i]));
    }
 }
 
@@ -160,11 +130,8 @@ void Fem::glob_b(double t) {
       el1 = f.f(grid[i], t);
       el2 = f.f(grid[i + 1], t);
 
-      loc_b[0] = (grid[i + 1] - grid[i]) * (2.0 * el1 + el2) / 6.0;
-      loc_b[1] = (grid[i + 1] - grid[i]) * (el1 + 2.0 * el2) / 6.0;
-
-      b[i] += loc_b[0];
-      b[i + 1] += loc_b[1];
+      b[i] += (grid[i + 1] - grid[i]) * (2.0 * el1 + el2) / 6.0;
+      b[i + 1] += (grid[i + 1] - grid[i]) * (el1 + 2.0 * el2) / 6.0;
    }
 }
 
@@ -257,7 +224,7 @@ double Fem::residual() {
    vector<double> vec(nx);
    double res = 0.0; double nb = 0.0;
    vec = matr_vec_mult(q, A);
-   for (int i = 0; i < 0; i++) vec[i] -= d[i];
+   for (int i = 0; i < nx; i++) vec[i] -= d[i];
    for (int i = 0; i < nx; i++) {
       res += vec[i] * vec[i]; 
       nb += d[i] * d[i];
@@ -291,35 +258,40 @@ void Fem::FPI() {
    double resid = 10.0;
 
    vector<double> q_prev(nx);
+   for (int i = 0; i < nx; i++) q_prev[i] = 1.0;
+   q = q_prev;
 
    for (int i = 1; i < n_times; i++) {
       while (resid > eps && num < maxiter) {
          time_scheme(i);
          LU();
-         //relax(q_prev);
+         relax(q_prev);
          num++;
          resid = residual();
          q_prev = q;
          iterLine(resid, num, fout);
       }
       errLine(fout, i);
+      q_init = q;
    }
 }
 
 void Fem::LU() {
-   for (int i = 1; i < nx; i++)
-   {
-      A[0][i] = A[0][i] / A[1][i - 1];
+   //nx = 3;
+   //A = { {0, 7, 0}, {1, 11, 1}, {0, 5, 0} };
+   //d = { 1, 44, 3 };
+   //q.resize(nx);
+
+   for (int i = 1; i < nx; i++) {
+      A[2][i - 1] = A[2][i - 1] / A[1][i - 1];
       A[1][i] = A[1][i] - A[0][i] * A[2][i - 1];
    }
    vector<double> y(nx);
-   y[0] = d[0];
+   y[0] = d[0] / A[1][0];
    for (int i = 1; i < nx; i++)
-      y[i] = d[i] - A[0][i] * y[i - 1];
-   q[nx - 1] = y[nx - 1] / A[1][nx - 1];
+      y[i] = (d[i] - A[0][i] * y[i - 1]) / A[1][i];
+   q[nx - 1] = y[nx - 1];
    for (int i = nx - 2; i >= 0; i--)
-      q[i] = (y[i] - A[2][i] * q[i + 1]) / A[1][i];
-
-   q_init = q;
+      q[i] = y[i] - A[2][i] * q[i + 1];
 }
 

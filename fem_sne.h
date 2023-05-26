@@ -9,7 +9,6 @@ using namespace std;
 class Fem {
 private:
    vector<vector<double>> A, M, G;        // матрицы в ленточном формате 
-   vector<vector<double>> loc_M, loc_G;   // локальные матрицы массы и жесткости
    vector<double> b;                      // вектор правой части 
    vector<double> d;                      // вектор правой части нестационарной задачи
    vector<double> q;                      // вектор решения 
@@ -17,9 +16,7 @@ private:
    vector<double> grid;                   // сетка по x
    vector<double> times;                  // сетка по времени
    vector<double> q_init;                 // начальное условие
-   vector<double> loc_b;                  // локальный вектор правой части 
-   vector<int> first_bc, second_bc, thrid_bc; // узлы, в которых выполнены ку
-
+  
    int nx;                                // кол-во конечных элементов, кол-во узлов
    int n_times;                           // количество временных слоев
    double hx, ht, kx, kt;                 // шаги сетки
