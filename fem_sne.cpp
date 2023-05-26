@@ -21,7 +21,7 @@ double Functions::u_betta(double x, double t) {
 }
 
 double Functions::lambda(double u) {
-   return 1.0;
+   return u;
 }
 
 Fem::Fem() {
@@ -217,7 +217,6 @@ void Fem::boundary(double t) {
       d[nx - 1] += betta * f.u_betta(grid[nx - 1], t);
       break;
    }
-
 }
 
 double Fem::residual() {
@@ -253,8 +252,8 @@ void Fem::iterLine(double resid, int num, ofstream &fout) {
 void Fem::FPI() {
    ofstream fout("answer.csv");
    int num = 0;
-   int maxiter = 1000;
-   double eps = 1e-14;
+   int maxiter = 100;
+   double eps = 1e-15;
    double resid = 10.0;
 
    vector<double> q_prev(nx);
@@ -262,11 +261,13 @@ void Fem::FPI() {
    q = q_prev;
 
    for (int i = 1; i < n_times; i++) {
+      time_scheme(i);
+      resid = residual();
       while (resid > eps && num < maxiter) {
-         time_scheme(i);
          LU();
          relax(q_prev);
          num++;
+         time_scheme(i);
          resid = residual();
          q_prev = q;
          iterLine(resid, num, fout);
@@ -277,10 +278,8 @@ void Fem::FPI() {
 }
 
 void Fem::LU() {
-   //nx = 3;
-   //A = { {0, 7, 0}, {1, 11, 1}, {0, 5, 0} };
-   //d = { 1, 44, 3 };
-   //q.resize(nx);
+   q.clear();
+   q.resize(nx);
 
    for (int i = 1; i < nx; i++) {
       A[2][i - 1] = A[2][i - 1] / A[1][i - 1];
