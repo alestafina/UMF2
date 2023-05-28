@@ -35,8 +35,11 @@ public:
    void glob_G();                         // вычисление глобальной матрицы жесткости
    void glob_b(double t);                 // вычисление глобального вектора правой части
    
-   void time_scheme(int idx);             // двуслойная неявная схема
-   
+   void glob_G_Nweton();                  // глобальная матрица жесткости для метода Ньютона
+   void glob_b_Newton(double t);                  // глобаьный вектор правой части для метода Ньютона
+
+   void time_scheme(int idx, bool Newton);             // двуслойная неявная схема
+
    vector<double> matr_vec_mult(vector<double> &x, vector<vector<double>> &A); // умножение матрицы на вектор
 
    void boundary(double t);               // учет краевых условий
@@ -48,6 +51,7 @@ public:
    double residual();                     // подсчет невзяки
    void relax(vector<double> &q_prev);    // применение параметра релаксации
    void FPI();                            // метод простой итерации
+   void Newton();                         // метод Ньютона
 };
 
 class Functions {
@@ -58,4 +62,5 @@ public:
    double theta(double x, double t);
    double u_betta(double x, double t);
    double lambda(double u);
+   double dldu(double u);
 };

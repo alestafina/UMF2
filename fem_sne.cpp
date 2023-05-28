@@ -9,7 +9,7 @@ double Functions::u_g(double x, double t) {
 }
 
 double Functions::f(double x, double t) {
-   return x;
+   return x - t * t;
 }
 
 double Functions::theta(double x, double t) {
@@ -22,6 +22,10 @@ double Functions::u_betta(double x, double t) {
 
 double Functions::lambda(double u) {
    return u;
+}
+
+double Functions::dldu(double u) {
+   return 1.0;
 }
 
 Fem::Fem() {
@@ -135,7 +139,51 @@ void Fem::glob_b(double t) {
    }
 }
 
-void Fem::time_scheme(int idx) {
+void Fem::glob_G_Nweton() {
+   Functions L;
+   double h;
+
+   G.clear();
+   G.resize(3);
+   for (int i = 0; i < 3; i++) G[i].resize(nx);
+
+   for (int i = 0; i < nx - 1; i++)
+   {
+      h = grid[i + 1] - grid[i];
+
+      G[0][i + 1] += -(L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * h);
+      G[1][i + 1] +=  (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * h);
+      G[1][i]     +=  (L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * h);
+      G[2][i]     += -(L.lambda(q[i]) + L.lambda(q[i + 1])) / (2.0 * h);
+      G[1][i]     +=   L.dldu(q[i]) * (q[i] - q[i + 1]) / (2.0 * h);
+      G[2][i]     +=   L.dldu(q[i + 1]) * (q[i] - q[i + 1]) / (2.0 * h);
+      G[0][i + 1] -=   L.dldu(q[i]) * (q[i] - q[i + 1]) / (2.0 * h);
+      G[1][i + 1] -=   L.dldu(q[i + 1]) * (q[i] - q[i + 1]) / (2.0 * h);
+   }
+}
+
+void Fem::glob_b_Newton(double t) {
+   Functions f;
+   double el1, el2, h, vq1;
+
+   b.clear();
+   b.resize(nx);
+
+   for (int i = 0; i < nx - 1; i++) {
+      h = grid[i + 1] - grid[i];
+      
+      el1 = f.f(grid[i], t);
+      el2 = f.f(grid[i + 1], t);
+
+      // вклад от u в правую часть
+      vq1 =  ((q[i] * q[i] + q[i + 1] * q[i + 1]) * (q[i] - q[i + 1])) / h;
+      
+      b[i]     += (grid[i + 1] - grid[i]) * (2.0 * el1 + el2) / 6.0 + vq1;
+      b[i + 1] += (grid[i + 1] - grid[i]) * (el1 + 2.0 * el2) / 6.0 - vq1;
+   }
+}
+
+void Fem::time_scheme(int idx, bool Newton) {
    double dt = times[idx] - times[idx - 1];
    vector<double> tmp(nx);
    vector<vector<double>> tmpM(3, vector<double>(nx));
@@ -143,7 +191,9 @@ void Fem::time_scheme(int idx) {
    A.clear();
    A.resize(3, vector<double>(nx));
 
-   glob_G();
+   if (Newton) glob_G_Nweton();
+   else glob_G();
+
    glob_M();
 
    for (int i = 0; i < 3; i++) {
@@ -155,7 +205,9 @@ void Fem::time_scheme(int idx) {
    d.clear();
    d.resize(nx);
 
-   glob_b(times[idx]);
+   if (Newton) glob_b_Newton(times[idx]);
+   else glob_b(times[idx]);
+
    d = b;
 
    for (int i = 0; i < 3; i++) {
@@ -261,13 +313,13 @@ void Fem::FPI() {
    q = q_prev;
 
    for (int i = 1; i < n_times; i++) {
-      time_scheme(i);
+      time_scheme(i, 0);
       resid = residual();
       while (resid > eps && num < maxiter) {
          LU();
          relax(q_prev);
          num++;
-         time_scheme(i);
+         time_scheme(i, 0);
          resid = residual();
          q_prev = q;
          iterLine(resid, num, fout);
@@ -276,6 +328,36 @@ void Fem::FPI() {
       q_init = q;
    }
 }
+
+void Fem::Newton() {
+   ofstream fout("newton_answer.csv");
+   int num = 0;
+   int maxiter = 100;
+   double eps = 1e-15;
+   double resid = 10.0;
+
+   vector<double> q_prev(nx);
+   for (int i = 0; i < nx; i++) q_prev[i] = 1.0;
+   q = q_prev;
+
+   for (int i = 1; i < n_times; i++) {
+      time_scheme(i, 0);
+      resid = residual();
+      while (resid > eps && num < maxiter) {
+         time_scheme(i, 1);
+         LU();
+         relax(q_prev);
+         num++;
+         time_scheme(i, 0);
+         resid = residual();
+         q_prev = q;
+         iterLine(resid, num, fout);
+      }
+      errLine(fout, i);
+      q_init = q;
+   }
+}
+
 
 void Fem::LU() {
    q.clear();
